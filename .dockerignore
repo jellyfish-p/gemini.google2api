@@ -1,0 +1,12 @@
+.git
+.github
+.nuxt
+.output
+node_modules
+npm-debug.log*
+*.log
+.env
+.env.*
+data/*.db
+data/*.db-shm
+data/*.db-wal

@@ -145,6 +145,20 @@ CI 会执行：
 5. `npm run build`
 6. 打包 `.output`、`package.json`、`package-lock.json`、`config.toml`
 7. 上传 `gemini-google2api-${{ github.sha }}.tar.gz` artifact
+8. 使用 Docker Buildx 构建镜像
+9. 非 PR 触发时推送镜像到 GitHub Container Registry：`ghcr.io/<owner>/<repo>`
+
+本地构建 Docker 镜像：
+
+```bash
+docker build -t gemini-google2api .
+```
+
+本地运行 Docker 镜像：
+
+```bash
+docker run --rm -p 3000:3000 -v ./data:/app/data gemini-google2api
+```
 
 ## 常用脚本
 
