@@ -8,6 +8,8 @@ lerna-debug.log*
 
 # database
 *.sqlite
+*.db-shm
+*.db-wal
 
 # package-json
 package-json.lock
@@ -111,3 +113,5 @@ dist
 
 # TernJS port file
 .tern-port
+
+.output/

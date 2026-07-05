@@ -1,0 +1,25 @@
+# Gemini google2api Configuration
+
+[server]
+port = 3000
+host = "0.0.0.0"
+
+[database]
+path = "./data/gemini.db"
+
+[admin]
+# Password for the admin management panel at /admin
+password = "admin123"
+
+[auth]
+# Set enabled to true for production; false allows open access
+# Keys are stored directly in this file; the admin panel edits this array.
+enabled = false
+keys = ["sk-gemini2api-example-change-me"]
+
+[pool]
+# Strategy for selecting accounts: "round-robin" | "least-used" | "random"
+strategy = "round-robin"
+
+# Accounts are managed via the web admin panel at /admin (SQLite-backed).
+# Global proxy and pool strategy can also be configured through the admin panel.

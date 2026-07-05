@@ -1,0 +1,28 @@
+{
+  "name": "gemini-google2api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxi dev",
+    "build": "nuxi build",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "nuxi typecheck"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.9.0",
+    "@nuxtjs/i18n": "^10.4.0",
+    "better-sqlite3": "^11.7.0",
+    "nuxt": "^4.0.0",
+    "ofetch": "^1.4.1",
+    "tailwindcss": "^4.3.2",
+    "toml": "^3.0.0",
+    "undici": "^7.28.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.0",
+    "vue-tsc": "^2.2.0"
+  }
+}
