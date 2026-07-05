@@ -13,7 +13,7 @@
         </template>
 
         <div class="grid gap-4 text-sm text-slate-600 md:grid-cols-2">
-          <div class="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 transition hover:border-slate-300 hover:shadow-sm">
+          <div class="rounded-xl border border-slate-200 bg-linear-to-br from-slate-50 to-white p-4 transition hover:border-slate-300 hover:shadow-sm">
             <div class="mb-2 flex items-center gap-2 font-medium text-slate-900">
               <div class="flex h-7 w-7 items-center justify-center rounded-md bg-amber-50 text-amber-600">
                 <UIcon name="i-lucide-key-round" class="size-3.5" />
@@ -22,7 +22,7 @@
             </div>
             <p class="leading-relaxed">{{ t('overview.configKeysDescription') }}</p>
           </div>
-          <div class="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 transition hover:border-slate-300 hover:shadow-sm">
+          <div class="rounded-xl border border-slate-200 bg-linear-to-br from-slate-50 to-white p-4 transition hover:border-slate-300 hover:shadow-sm">
             <div class="mb-2 flex items-center gap-2 font-medium text-slate-900">
               <div class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-50 text-indigo-600">
                 <UIcon name="i-lucide-database" class="size-3.5" />
@@ -96,10 +96,10 @@ const { stats, logs, loadData } = useAdminState()
 const { t } = useI18n()
 const tokensK = computed(() => Math.round(stats.value.totalTokens / 1000))
 const metrics = computed(() => [
-  { label: t('overview.metrics.keys'), value: `${stats.value.activeKeys} / ${stats.value.totalKeys}`, icon: 'i-lucide-key-round', color: 'bg-gradient-to-br from-amber-500 to-amber-600' },
-  { label: t('overview.metrics.accounts'), value: `${stats.value.activeAccounts} / ${stats.value.totalAccounts}`, icon: 'i-lucide-users', color: 'bg-gradient-to-br from-blue-500 to-blue-600' },
-  { label: t('overview.metrics.requests'), value: stats.value.totalRequests.toLocaleString(), icon: 'i-lucide-arrow-left-right', color: 'bg-gradient-to-br from-emerald-500 to-emerald-600' },
-  { label: t('overview.metrics.tokens'), value: `${tokensK.value.toLocaleString()}K`, icon: 'i-lucide-binary', color: 'bg-gradient-to-br from-violet-500 to-violet-600' },
+  { label: t('overview.metrics.keys'), value: `${stats.value.activeKeys} / ${stats.value.totalKeys}`, icon: 'i-lucide-key-round', color: 'bg-linear-to-br from-amber-500 to-amber-600' },
+  { label: t('overview.metrics.accounts'), value: `${stats.value.activeAccounts} / ${stats.value.totalAccounts}`, icon: 'i-lucide-users', color: 'bg-linear-to-br from-blue-500 to-blue-600' },
+  { label: t('overview.metrics.requests'), value: stats.value.totalRequests.toLocaleString(), icon: 'i-lucide-arrow-left-right', color: 'bg-linear-to-br from-emerald-500 to-emerald-600' },
+  { label: t('overview.metrics.tokens'), value: `${tokensK.value.toLocaleString()}K`, icon: 'i-lucide-binary', color: 'bg-linear-to-br from-violet-500 to-violet-600' },
 ])
 
 onMounted(loadData)

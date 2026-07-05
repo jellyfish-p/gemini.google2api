@@ -58,7 +58,7 @@
         </div>
       </template>
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
+        <table class="w-full min-w-225 text-left text-sm">
           <thead class="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
             <tr>
               <th class="px-4 py-3.5 font-semibold">ID</th>
@@ -75,7 +75,7 @@
             <tr v-for="a in accounts" :key="a.id" class="transition hover:bg-slate-50" :class="{ 'opacity-60': !a.is_active }">
               <td class="px-4 py-3.5 text-slate-500 tabular-nums">{{ a.id }}</td>
               <td class="px-4 py-3.5 font-medium">{{ a.name }}</td>
-              <td class="max-w-[200px] truncate px-4 py-3.5 font-mono text-xs text-slate-500">{{ a.proxy || '-' }}</td>
+              <td class="max-w-50 truncate px-4 py-3.5 font-mono text-xs text-slate-500">{{ a.proxy || '-' }}</td>
               <td class="px-4 py-3.5">
                 <UBadge :color="a.is_active ? 'success' : 'error'" variant="soft">
                   {{ a.is_active ? t('common.active') : t('common.inactive') }}
