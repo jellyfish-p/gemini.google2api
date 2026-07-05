@@ -61,7 +61,7 @@ export function parseResponseByFrame(content: string): { frames: any[]; remainin
   const parsedFrames: any[] = []
 
   while (consumedPos < totalLen) {
-    while (consumedPos < totalLen && content[consumedPos].trim() === '') {
+    while (consumedPos < totalLen && (content[consumedPos] ?? '').trim() === '') {
       consumedPos++
     }
     if (consumedPos >= totalLen) break
@@ -69,7 +69,7 @@ export function parseResponseByFrame(content: string): { frames: any[]; remainin
     const match = LENGTH_MARKER_RE.exec(content.slice(consumedPos))
     if (!match || match.index !== 0) break
 
-    const lengthVal = parseInt(match[1], 10)
+    const lengthVal = parseInt(match[1] ?? '0', 10)
     const startContent = consumedPos + match[0].length
 
     const { chars, units } = getCharCountForUtf16Units(content, startContent, lengthVal)
@@ -140,16 +140,41 @@ export function parseCandidateResponse(candidateData: any): {
   thoughts: string
   webImages: any[]
   generatedImages: any[]
+  videos: any[]
+  media: any[]
+}
+export function parseCandidateResponse(candidateData: any, metadata: { conversationId?: string; replyId?: string; candidateId?: string }): {
+  text: string
+  thoughts: string
+  webImages: any[]
+  generatedImages: any[]
+  videos: any[]
+  media: any[]
+}
+export function parseCandidateResponse(candidateData: any, metadata?: { conversationId?: string; replyId?: string; candidateId?: string }): {
+  text: string
+  thoughts: string
+  webImages: any[]
+  generatedImages: any[]
+  videos: any[]
+  media: any[]
 } {
   let text = ''
   let thoughts = ''
   const webImages: any[] = []
   const generatedImages: any[] = []
+  const videos: any[] = []
+  const mediaItems: any[] = []
+
+  const directText = getNestedValue(candidateData, [1, 0])
+  if (typeof directText === 'string') {
+    text = directText
+  }
 
   const textBlocks = getNestedValue(candidateData, [4, 0])
   const thoughtBlocks = getNestedValue(candidateData, [4, 1])
 
-  if (Array.isArray(textBlocks)) {
+  if (!text && Array.isArray(textBlocks)) {
     text = textBlocks.map((b: any) => {
       if (typeof b === 'string') return b
       const t = getNestedValue(b, [0, 0])
@@ -180,7 +205,32 @@ export function parseCandidateResponse(candidateData: any): {
     }
   }
 
-  return { text, thoughts, webImages, generatedImages }
+  const mediaRoot = getNestedValue(candidateData, [12], [])
+  const conversationId = metadata?.conversationId || ''
+  const replyId = metadata?.replyId || ''
+  const candidateId = metadata?.candidateId || ''
+
+  const videoUrls =
+    getNestedValue(mediaRoot, [59, 0, 0, 0, 0, 7], null)
+    ?? getNestedValue(mediaRoot, [59, 0, 0, 0, 7], [])
+  if (Array.isArray(videoUrls) && videoUrls.length >= 2) {
+    videos.push({ url: videoUrls[1], thumbnail: videoUrls[0], conversationId, replyId, candidateId })
+  }
+
+  const mediaData = getNestedValue(mediaRoot, [86], [])
+  if (Array.isArray(mediaData) && mediaData.length > 0) {
+    const mp3List = getNestedValue(mediaData, [0, 1, 7], [])
+    const mp4List = getNestedValue(mediaData, [1, 1, 7], [])
+    const mp3Url = Array.isArray(mp3List) && mp3List.length >= 2 ? mp3List[1] : ''
+    const mp3Thumbnail = Array.isArray(mp3List) && mp3List.length >= 2 ? mp3List[0] : ''
+    const mp4Url = Array.isArray(mp4List) && mp4List.length >= 2 ? mp4List[1] : ''
+    const mp4Thumbnail = Array.isArray(mp4List) && mp4List.length >= 2 ? mp4List[0] : ''
+    if (mp3Url || mp4Url) {
+      mediaItems.push({ mp3Url, mp3Thumbnail, mp4Url, mp4Thumbnail, conversationId, replyId, candidateId })
+    }
+  }
+
+  return { text, thoughts, webImages, generatedImages, videos, media: mediaItems }
 }
 
 export function getTextDelta(newRaw: string, lastSentClean: string, isFinal: boolean): string {

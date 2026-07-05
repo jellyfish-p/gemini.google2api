@@ -12,6 +12,12 @@ export const GRPC = {
   LIST_CHATS: 'MaZiqc',
   READ_CHAT: 'hNvQHb',
   DELETE_CHAT: ['GzXR5e', 'qWymEb'],
+  DEEP_RESEARCH_STATUS: 'kwDCne',
+  DEEP_RESEARCH_PREFS: 'L5adhe',
+  DEEP_RESEARCH_BOOTSTRAP: 'ku4Jyf',
+  DEEP_RESEARCH_MODEL_STATE: 'qpEbW',
+  DEEP_RESEARCH_CAPS: 'aPya6c',
+  DEEP_RESEARCH_ACK: 'PCck7e',
 } as const
 
 export const MODEL_HEADER_KEY = 'x-goog-ext-525001261-jspb'

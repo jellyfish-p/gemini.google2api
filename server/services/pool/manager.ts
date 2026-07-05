@@ -1,6 +1,7 @@
 import { getConfig } from '../../config'
 import { getDb, getSetting } from '../../database/client'
-import { GeminiSession, initSession } from '../gemini/client'
+import { initSession } from '../gemini/client'
+import type { GeminiSession } from '../gemini/client'
 
 interface PoolAccount {
   id: number
@@ -115,18 +116,22 @@ export async function acquireSession(): Promise<GeminiSession> {
 }
 
 function acquireWithStrategy(available: PoolAccount[], strategy: string): GeminiSession {
+  if (available.length === 0) {
+    throw new Error('No available accounts in pool')
+  }
+
   let account: PoolAccount
 
   switch (strategy) {
     case 'random': {
       const idx = Math.floor(Math.random() * available.length)
-      account = available[idx]
+      account = available[idx]!
       break
     }
     case 'least-used': {
       const db = getDb()
       let minUsage = Infinity
-      let selected = available[0]
+      let selected = available[0]!
       for (const a of available) {
         const row = db.prepare('SELECT total_requests FROM accounts WHERE id = ?').get(a.id) as any
         const usage = row?.total_requests ?? 0
@@ -143,10 +148,11 @@ function acquireWithStrategy(available: PoolAccount[], strategy: string): Gemini
       const indices = available.map(a => pool.indexOf(a))
       const sorted = indices.filter(i => i >= roundRobinIndex)
       if (sorted.length > 0) {
-        account = pool[sorted[0]]
-        roundRobinIndex = sorted[0] + 1
+        const selectedIndex = sorted[0]!
+        account = pool[selectedIndex]!
+        roundRobinIndex = selectedIndex + 1
       } else {
-        account = available[0]
+        account = available[0]!
         roundRobinIndex = 1
       }
       if (roundRobinIndex >= pool.length) roundRobinIndex = 0

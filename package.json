@@ -6,7 +6,8 @@
     "dev": "nuxi dev",
     "build": "nuxi build",
     "start": "node .output/server/index.mjs",
-    "typecheck": "nuxi typecheck"
+    "typecheck": "nuxi typecheck",
+    "test": "nuxi prepare && vitest run"
   },
   "dependencies": {
     "@nuxt/ui": "^4.9.0",
@@ -23,6 +24,7 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/uuid": "^10.0.0",
     "typescript": "^5.7.0",
+    "vitest": "^3.2.4",
     "vue-tsc": "^2.2.0"
   }
 }

@@ -1,8 +1,10 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { ProxyAgent } from 'undici'
 import { getDb, getSetting } from '../../database/client'
-import { ENDPOINTS, GRPC, MODEL_HEADER_KEY, DEFAULT_METADATA, STREAMING_FLAG_INDEX, MODELS, MODEL_ALIASES } from './constants'
+import { ENDPOINTS, GRPC, MODEL_HEADER_KEY, DEFAULT_METADATA, MODELS, MODEL_ALIASES } from './constants'
+import { buildGenerateInnerRequest, extractDeepResearchPlan, isDeepResearchModel } from './deep-research'
 import { getNestedValue, extractJsonFromResponse, parseCandidateResponse } from './utils'
+import type { DeepResearchPlan, DeepResearchStatus, GeminiMedia, GeminiVideo } from './types'
 
 export interface GeminiSession {
   accessToken: string
@@ -244,6 +246,7 @@ export interface GenerateOptions {
   model?: string
   conversationId?: string
   replyId?: string
+  candidateId?: string
   temporary?: boolean
   deepResearch?: boolean
   onChunk?: (text: string, done: boolean) => void
@@ -254,9 +257,13 @@ export interface GenerateResult {
   text: string
   thoughts: string
   images: { url: string; title: string; alt: string; isGenerated: boolean }[]
+  videos: GeminiVideo[]
+  media: GeminiMedia[]
   conversationId: string
   replyId: string
   candidateId: string
+  deepResearchPlan?: DeepResearchPlan | null
+  deepResearchStatuses?: DeepResearchStatus[]
 }
 
 export async function generateContent(options: GenerateOptions): Promise<GenerateResult> {
@@ -265,35 +272,22 @@ export async function generateContent(options: GenerateOptions): Promise<Generat
   if (!prompt) throw new Error('Prompt cannot be empty')
 
   const reqId = randomInt(100000, 999999)
-  const resolvedModel = resolveModel(model, session)
-
-  const chatMetadata = options.conversationId
-    ? [...DEFAULT_METADATA]
-    : [...DEFAULT_METADATA]
-
-  const innerReq: any[] = new Array(69).fill(null)
-  innerReq[0] = [prompt, 0, null, null, null, null, 0]
-  innerReq[1] = [session.language]
-  innerReq[2] = chatMetadata
-  innerReq[6] = [1]
-  innerReq[STREAMING_FLAG_INDEX] = 1
-  innerReq[10] = 1
-  innerReq[11] = 0
-  innerReq[17] = [[0]]
-  innerReq[18] = 0
-  innerReq[27] = 1
-  innerReq[30] = [4]
-  innerReq[41] = [1]
-  innerReq[53] = 0
-  innerReq[61] = []
-  innerReq[68] = 2
-
-  if (temporary) {
-    innerReq[TEMPORARY_CHAT_FLAG_INDEX] = 1
-  }
+  const resolvedModel = resolveModel(model)
 
   const uuid = randomUUID().toUpperCase()
-  innerReq[59] = uuid
+  const chatMetadata = [...DEFAULT_METADATA]
+  if (options.conversationId) chatMetadata[0] = options.conversationId
+  if (options.replyId) chatMetadata[1] = options.replyId
+  if (options.candidateId) chatMetadata[2] = options.candidateId
+
+  const innerReq = buildGenerateInnerRequest({
+    prompt,
+    language: session.language,
+    metadata: chatMetadata,
+    temporary,
+    deepResearch: options.deepResearch,
+    uuid,
+  })
 
   const params = new URLSearchParams({
     'bl': session.buildLabel,
@@ -337,10 +331,13 @@ export async function generateContent(options: GenerateOptions): Promise<Generat
   let fullText = ''
   let fullThoughts = ''
   let allImages: { url: string; title: string; alt: string; isGenerated: boolean }[] = []
+  let allVideos: GeminiVideo[] = []
+  let allMedia: GeminiMedia[] = []
+  let deepResearchPlan: DeepResearchPlan | null = null
 
   let resultConvId = options.conversationId ?? ''
   let resultReplyId = options.replyId ?? ''
-  let resultCandidateId = ''
+  let resultCandidateId = options.candidateId ?? ''
 
   const { parseResponseByFrame, parseCandidateResponse } = await import('./utils')
 
@@ -372,10 +369,19 @@ export async function generateContent(options: GenerateOptions): Promise<Generat
           const rcid = getNestedValue(candidateData, [0])
           if (rcid) resultCandidateId = rcid
 
-          const parsed = parseCandidateResponse(candidateData)
+          const parsed = parseCandidateResponse(candidateData, {
+            conversationId: resultConvId,
+            replyId: resultReplyId,
+            candidateId: resultCandidateId,
+          })
           if (parsed.text) {
             fullText = parsed.text
             allImages = [...parsed.webImages, ...parsed.generatedImages]
+            allVideos = parsed.videos
+            allMedia = parsed.media
+          }
+          if (options.deepResearch) {
+            deepResearchPlan = extractDeepResearchPlan(candidateData, parsed.text) ?? deepResearchPlan
           }
           if (parsed.thoughts) {
             fullThoughts = parsed.thoughts
@@ -402,12 +408,23 @@ export async function generateContent(options: GenerateOptions): Promise<Generat
           const partJson = JSON.parse(innerJsonStr)
           const candidatesList = getNestedValue(partJson, [4], [])
           for (const candidateData of candidatesList) {
-            const parsed = parseCandidateResponse(candidateData)
+            const rcid = getNestedValue(candidateData, [0])
+            if (rcid) resultCandidateId = rcid
+            const parsed = parseCandidateResponse(candidateData, {
+              conversationId: resultConvId,
+              replyId: resultReplyId,
+              candidateId: resultCandidateId,
+            })
             if (parsed.text) {
               fullText = parsed.text
               if (parsed.webImages.length || parsed.generatedImages.length) {
                 allImages = [...parsed.webImages, ...parsed.generatedImages]
               }
+              if (parsed.videos.length) allVideos = parsed.videos
+              if (parsed.media.length) allMedia = parsed.media
+            }
+            if (options.deepResearch) {
+              deepResearchPlan = extractDeepResearchPlan(candidateData, parsed.text) ?? deepResearchPlan
             }
             if (parsed.thoughts) fullThoughts = parsed.thoughts
 
@@ -434,9 +451,13 @@ export async function generateContent(options: GenerateOptions): Promise<Generat
     text: fullText || '', // If no text extracted, use what model sent
     thoughts: fullThoughts,
     images: allImages,
+    videos: allVideos,
+    media: allMedia,
     conversationId: resultConvId,
     replyId: resultReplyId,
     candidateId: resultCandidateId,
+    deepResearchPlan,
+    deepResearchStatuses: [],
   }
 }
 
@@ -447,7 +468,7 @@ export async function generateContentStream(
 }
 
 export function resolveModel(model?: string): { modelName: string; modelHeader: Record<string, string> } | undefined {
-  if (!model || model === 'unspecified') return undefined
+  if (!model || model === 'unspecified' || isDeepResearchModel(model)) return undefined
 
   const resolvedName = MODEL_ALIASES[model] ?? model
   const modelInfo = MODELS[resolvedName]
@@ -463,6 +484,50 @@ export function resolveModel(model?: string): { modelName: string; modelHeader: 
       [MODEL_HEADER_KEY]: `[1,null,null,null,"${model}",null,null,0,[4],null,null,1]`,
     },
   }
+}
+
+export async function readChat(session: GeminiSession, cid: string, limit = 5): Promise<GenerateResult | null> {
+  if (!cid) return null
+
+  const response = await sendBatchExecute(session, [
+    { rpcid: GRPC.READ_CHAT, payload: JSON.stringify([cid, limit, null, 1, [1], [4], null, 1]) },
+  ])
+
+  for (const part of response) {
+    const bodyStr = getNestedValue(part, [2])
+    if (!bodyStr) continue
+    try {
+      const body = typeof bodyStr === 'string' ? JSON.parse(bodyStr) : bodyStr
+      const turns = getNestedValue(body, [0], [])
+      if (!Array.isArray(turns)) continue
+
+      for (const turn of turns) {
+        const replyId = getNestedValue(turn, [0, 1], '')
+        const candidates = getNestedValue(turn, [3, 0], [])
+        if (!Array.isArray(candidates) || candidates.length === 0) continue
+
+        const candidate = candidates[0]
+        const candidateId = getNestedValue(candidate, [0], '')
+        const parsed = parseCandidateResponse(candidate, { conversationId: cid, replyId, candidateId })
+        return {
+          text: parsed.text,
+          thoughts: parsed.thoughts,
+          images: [...parsed.webImages, ...parsed.generatedImages],
+          videos: parsed.videos,
+          media: parsed.media,
+          conversationId: cid,
+          replyId,
+          candidateId,
+          deepResearchPlan: null,
+          deepResearchStatuses: [],
+        }
+      }
+    } catch {
+      // Ignore incomplete chat history payloads.
+    }
+  }
+
+  return null
 }
 
 export async function getAvailableModels(session: GeminiSession): Promise<any[]> {

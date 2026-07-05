@@ -1,5 +1,7 @@
 import { acquireSession, releaseSession } from '~~/server/services/pool/manager'
-import { generateContent } from '~~/server/services/gemini/client'
+import { generateContent, readChat, sendBatchExecute } from '~~/server/services/gemini/client'
+import { isDeepResearchModel, runDeepResearch } from '~~/server/services/gemini/deep-research'
+import { formatGeminiGenerateContentResponse } from '~~/server/services/gemini/responses'
 
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug') || ''
@@ -8,7 +10,7 @@ export default defineEventHandler(async (event) => {
   // Extract model name and action from path like "gemini-2.0-flash:generateContent"
   const parts = path.split(':')
   const action = parts[1] || 'generateContent'
-  const modelParam = parts[0].replace(/^\/+/, '')
+  const modelParam = (parts[0] ?? '').replace(/^\/+/, '')
 
   if (!modelParam) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'Model name is required' })
@@ -41,54 +43,32 @@ export default defineEventHandler(async (event) => {
     }
     prompt += 'Assistant:'
 
+    let session: Awaited<ReturnType<typeof acquireSession>> | undefined
     try {
-      const session = await acquireSession()
-      const result = await generateContent({
-        prompt,
-        session,
-        model: modelParam,
-      })
-      releaseSession(session.accountId)
-
-      const responseId = `chatcmpl-${Date.now()}`
-      const now = Math.floor(Date.now() / 1000)
-
-      const candidates = [{
-        content: {
-          role: 'model',
-          parts: [{ text: result.text }],
-        },
-        finishReason: 'STOP',
-        index: 0,
-      }]
-
-      if (result.images.length > 0) {
-        candidates[0].content.parts.push(
-          ...result.images.map(img => ({
-            inlineData: { mimeType: 'image/png', data: img.url },
-          }))
-        )
-      }
-
-      if (result.thoughts) {
-        candidates[0].content.parts.push({ text: `[Thought process]: ${result.thoughts}` })
-      }
-
-      return {
-        candidates,
-        usageMetadata: {
-          promptTokenCount: Math.ceil(prompt.length / 4),
-          candidatesTokenCount: Math.ceil(result.text.length / 4),
-          totalTokenCount: Math.ceil((prompt.length + result.text.length) / 4),
-        },
-        modelVersion: modelParam,
-      }
+      session = await acquireSession()
+      const result = isDeepResearchModel(modelParam)
+        ? await runDeepResearch({
+            prompt,
+            session,
+            model: modelParam,
+            generateContent,
+            sendBatchExecute,
+            readChat,
+          })
+        : await generateContent({
+            prompt,
+            session,
+            model: modelParam,
+          })
+      return formatGeminiGenerateContentResponse({ result, model: modelParam, prompt })
     } catch (err: any) {
       throw createError({
         statusCode: 502,
         statusMessage: 'Bad Gateway',
         message: err.message || 'Gemini API error',
       })
+    } finally {
+      if (session) releaseSession(session.accountId)
     }
   }
 

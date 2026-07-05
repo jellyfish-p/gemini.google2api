@@ -1,5 +1,7 @@
 import { acquireSession, releaseSession } from '~~/server/services/pool/manager'
-import { generateContent } from '~~/server/services/gemini/client'
+import { generateContent, readChat, sendBatchExecute } from '~~/server/services/gemini/client'
+import { isDeepResearchModel, runDeepResearch } from '~~/server/services/gemini/deep-research'
+import { formatOpenAIChatCompletionResponse } from '~~/server/services/gemini/responses'
 import { getDb } from '~~/server/database/client'
 
 export default defineEventHandler(async (event) => {
@@ -21,21 +23,46 @@ export default defineEventHandler(async (event) => {
     return `${role}: ${content}`
   }).join('\n')
 
+  let session: Awaited<ReturnType<typeof acquireSession>> | undefined
   try {
-    const session = await acquireSession()
+    session = await acquireSession()
 
     const systemMsg = messages.find((m: any) => m.role === 'system')
     const finalPrompt = systemMsg
       ? `System: ${systemMsg.content}\n\n${prompt}`
       : prompt
 
-    const result = await generateContent({
-      prompt: finalPrompt,
-      session,
-      model: modelName,
-    })
-
-    releaseSession(session.accountId)
+    const result = isDeepResearchModel(modelName)
+      ? await runDeepResearch({
+          prompt: finalPrompt,
+          session,
+          model: modelName,
+          generateContent,
+          sendBatchExecute,
+          readChat,
+          onStatus: stream
+            ? (status) => {
+                const res = event.node.res
+                if (!res.headersSent) {
+                  setHeader(event, 'Content-Type', 'text/event-stream')
+                  setHeader(event, 'Cache-Control', 'no-cache')
+                  setHeader(event, 'Connection', 'keep-alive')
+                }
+                res.write(`data: ${JSON.stringify({
+                  id: `chatcmpl-${Date.now()}`,
+                  object: 'chat.completion.chunk',
+                  created: Math.floor(Date.now() / 1000),
+                  model: modelName,
+                  choices: [{ index: 0, delta: { deep_research: status }, finish_reason: null }],
+                })}\n\n`)
+              }
+            : undefined,
+        })
+      : await generateContent({
+          prompt: finalPrompt,
+          session,
+          model: modelName,
+        })
 
     // Log usage
     const db = getDb()
@@ -78,29 +105,20 @@ export default defineEventHandler(async (event) => {
       return
     }
 
-    return {
-      id: responseId,
-      object: 'chat.completion',
-      created: now,
+    return formatOpenAIChatCompletionResponse({
+      result,
       model: modelName || 'gemini-2.0-flash',
-      choices: [
-        {
-          index: 0,
-          message: { role: 'assistant', content: result.text },
-          finish_reason: 'stop',
-        },
-      ],
-      usage: {
-        prompt_tokens: Math.ceil(finalPrompt.length / 4),
-        completion_tokens: Math.ceil(result.text.length / 4),
-        total_tokens: Math.ceil((finalPrompt.length + result.text.length) / 4),
-      },
-    }
+      prompt: finalPrompt,
+      responseId,
+      created: now,
+    })
   } catch (err: any) {
     throw createError({
       statusCode: 502,
       statusMessage: 'Bad Gateway',
       message: err.message || 'Gemini API error',
     })
+  } finally {
+    if (session) releaseSession(session.accountId)
   }
 })
