@@ -27,17 +27,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Restore Nuxt build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .nuxt/cache
-            node_modules/.cache
-          key: ${{ runner.os }}-nuxt-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/**', 'server/**', 'nuxt.config.ts', 'tsconfig.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nuxt-${{ hashFiles('package-lock.json') }}-
-            ${{ runner.os }}-nuxt-
-
       - name: Install dependencies
         run: npm ci
 
