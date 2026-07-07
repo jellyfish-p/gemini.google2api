@@ -98,6 +98,38 @@ curl http://localhost:3000/api/v1/chat/completions \
   }'
 ```
 
+### Image Generations
+
+生图接口兼容 OpenAI 风格的 `POST /api/v1/images/generations`。请求会被转换为 Gemini 图片生成提示词，并从 Gemini 返回中提取 generated image URL。
+
+```bash
+curl http://localhost:3000/api/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-gemini2api-example-change-me" \
+  -d '{
+    "model": "gemini-2.5-flash",
+    "prompt": "一张干净的 SaaS 控制台产品海报，浅色背景，细腻科技感",
+    "n": 1,
+    "size": "1024x1024"
+  }'
+```
+
+响应格式：
+
+```json
+{
+  "created": 1780000000,
+  "data": [
+    {
+      "url": "https://...",
+      "revised_prompt": "一张干净的 SaaS 控制台产品海报，浅色背景，细腻科技感"
+    }
+  ]
+}
+```
+
+当前支持字段：`prompt`、`model`、`n`、`size`。其中 `n` 用于限制返回图片数量；`size` 会保留为兼容输入，实际生成能力取决于 Gemini Web 当前账号和模型支持。
+
 ### Deep Research / DeepSearch
 
 `gemini-deepsearch` 是一个虚拟模型，会把普通兼容请求映射到 Gemini Web 的 Deep Research 流程：创建研究计划、自动确认启动、轮询状态并返回最终报告。该能力通常需要账号本身具备 Deep Research 权限。
@@ -204,6 +236,7 @@ node .output/server/index.mjs
 - push 到 `main`
 - pull request
 - 手动触发 `workflow_dispatch`
+- 仅更新 `README.md`、`docs/**` 或 Markdown 文档时，不触发自动构建；仍可手动运行 workflow
 
 `build.yml` 会执行：
 
